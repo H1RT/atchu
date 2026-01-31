@@ -80,8 +80,6 @@
   assign text_color = section.settings.text_color
 -%}
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
-
 {%- style -%}
   {{ count_font | font_face: font_display: 'swap' }}
   {{ text_font | font_face: font_display: 'swap' }}
@@ -156,13 +154,11 @@
     transition: all 0.25s ease 0s;
   }
 
-  /* ===== Desktop grid (default) ===== */
-  .stats-slider-{{ section.id }} { display: none; }
-
+  /* ===== Grid layout (all breakpoints) ===== */
   .stats-grid-{{ section.id }} {
     display: grid;
-    grid-template-columns: repeat({{ items_per_row }}, 1fr);
-    margin-top: {{ items_mt }}px;
+    grid-template-columns: repeat({{ items_per_row }}, minmax(0, 1fr));
+    margin-top: {{ items_mt_mobile }}px;
     gap: {{ items_gap }}px;
   }
 
@@ -174,6 +170,7 @@
       margin-left: {{ margin_horizontal }}rem;
       margin-right: {{ margin_horizontal }}rem;
       border-radius: {{ section_radius }}px;
+      max-height: none;
     }
 
     .section-{{ section.id }}-settings {
@@ -211,21 +208,16 @@
     .stats-item-text-{{ section.id }} * {
       font-size: {{ text_size }}px;
     }
+
+    .stats-grid-{{ section.id }} {
+      margin-top: {{ items_mt }}px;
+    }
   }
 
-  /* ===== Mobile slider (under 1024px) ===== */
+  /* ===== Mobile layout ===== */
   @media (max-width: 1023px){
-    .stats-grid-{{ section.id }} { display: none; }
-    .stats-slider-{{ section.id }} { display: block; overflow: hidden; }
-
-    /* Swiper wrapper must be flex; Swiper sets this, but keep it safe */
-    .stats-slider-{{ section.id }} .swiper-wrapper {
-      transition-timing-function: linear !important;
-    }
-
-    /* Remove mobile vertical separators */
-    .stats-slider-{{ section.id }} .stats-item-{{ section.id }} {
-      border-bottom: 0 !important;
+    .section-{{ section.id }} {
+      max-height: 35vh;
     }
   }
 
@@ -393,37 +385,7 @@
       {% endif %}
     {% endfor %}
 
-    {%- comment -%} MOBILE slider (hidden on desktop) {%- endcomment -%}
-    <div class="stats-slider-{{ section.id }} swiper">
-      <div class="swiper-wrapper">
-        {% for block in section.blocks %}
-          {% if block.type == 'item' %}
-            <div class="stats-item-{{ section.id }} swiper-slide">
-              <div class="stats-count-wrapper-{{ section.id }}">
-                {% if block.settings.count_from != blank %}
-                  <p
-                    class="stats-count-text-{{ section.id }} stats-count-{{ section.id }}"
-                    data-from="{{ block.settings.count_from }}"
-                    data-to="{{ block.settings.count_to }}"
-                  >
-                    {{ block.settings.count_from }}
-                  </p>
-                {% endif %}
-                {% if block.settings.suffix != blank %}
-                  <p class="stats-count-text-{{ section.id }}">{{ block.settings.suffix }}</p>
-                {% endif %}
-              </div>
-
-              {% if block.settings.text != blank %}
-                <div class="stats-item-text-{{ section.id }}">{{ block.settings.text }}</div>
-              {% endif %}
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-    </div>
-
-    {%- comment -%} DESKTOP grid (hidden on mobile) {%- endcomment -%}
+    {%- comment -%} Grid stats {%- endcomment -%}
     <div class="stats-grid-{{ section.id }}">
       {% for block in section.blocks %}
         {% if block.type == 'item' %}
@@ -461,15 +423,10 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-
 <script>
-  // Count animation scoped to whichever layout is active (prevents Swiper clones causing duplicates)
+  // Count animation scoped to the stats grid
   function initStatsCount{{ section.id | replace: '-', '_' }}() {
-    const isMobile = window.matchMedia('(max-width: 1023px)').matches;
-    const scope = isMobile
-      ? document.querySelector('.stats-slider-{{ section.id }}')
-      : document.querySelector('.stats-grid-{{ section.id }}');
+    const scope = document.querySelector('.stats-grid-{{ section.id }}');
 
     if (!scope) return;
 
@@ -503,46 +460,11 @@
     });
   }
 
-  // Mobile-only Swiper
-  let statsSwiper{{ section.id | replace: '-', '_' }} = null;
-
-  function initStatsSliderMobile{{ section.id | replace: '-', '_' }}() {
-    const sliderEl = document.querySelector('.stats-slider-{{ section.id }}');
-    if (!sliderEl) return;
-
-    const isMobile = window.matchMedia('(max-width: 1023px)').matches;
-
-    if (isMobile) {
-      if (statsSwiper{{ section.id | replace: '-', '_' }}) return;
-
-      statsSwiper{{ section.id | replace: '-', '_' }} = new Swiper(sliderEl, {
-        slidesPerView: 2.1,
-        spaceBetween: {{ items_gap }},
-        loop: true,
-        speed: 8000,
-        autoplay: {
-          delay: 0,
-          disableOnInteraction: false
-        },
-        allowTouchMove: true,
-      });
-    } else {
-      if (statsSwiper{{ section.id | replace: '-', '_' }}) {
-        statsSwiper{{ section.id | replace: '-', '_' }}.destroy(true, true);
-        statsSwiper{{ section.id | replace: '-', '_' }} = null;
-      }
-    }
-  }
-
   document.addEventListener('DOMContentLoaded', () => {
-    initStatsSliderMobile{{ section.id | replace: '-', '_' }}();
     initStatsCount{{ section.id | replace: '-', '_' }}();
   });
 
   window.addEventListener('resize', () => {
-    initStatsSliderMobile{{ section.id | replace: '-', '_' }}();
-
-    // Allow count to animate in the newly active layout after resize
     document.querySelectorAll('.stats-count-{{ section.id }}').forEach(el => {
       el.dataset.countAnimated = 'false';
     });
@@ -551,15 +473,7 @@
 
   if (Shopify.designMode) {
     document.addEventListener('shopify:section:load', () => {
-      initStatsSliderMobile{{ section.id | replace: '-', '_' }}();
       initStatsCount{{ section.id | replace: '-', '_' }}();
-    });
-
-    document.addEventListener('shopify:section:unload', () => {
-      if (statsSwiper{{ section.id | replace: '-', '_' }}) {
-        statsSwiper{{ section.id | replace: '-', '_' }}.destroy(true, true);
-        statsSwiper{{ section.id | replace: '-', '_' }} = null;
-      }
     });
   }
 </script>
